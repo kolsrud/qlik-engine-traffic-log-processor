@@ -7,7 +7,6 @@ maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
 
 extra-source-files:
-- README.md
 - ChangeLog.md
 
 # Metadata used when publishing your package
@@ -21,12 +20,16 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- aeson
+- bytestring
+- text
+- unordered-containers
 
 library:
   source-dirs: src
 
 executables:
-  QlikEngineTrafficLogProcessor-exe:
+  TrafficLogProcessor:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
