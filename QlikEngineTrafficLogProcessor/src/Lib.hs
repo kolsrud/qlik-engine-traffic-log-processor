@@ -15,8 +15,9 @@ import qualified Data.HashMap.Strict as H
        
 processJson :: String -> MessageProps -> MessageProps
 processJson msg props =
-  let m_json = readObject (drop 4 msg)
-   in processJsonObject (fromJust m_json) props
+  case readObject msg of
+    Nothing -> error ("Unable to read object: " ++ msg)
+    Just json -> processJsonObject json props
 
 processJsonObject :: A.Object -> MessageProps -> MessageProps
 processJsonObject object props = props {
