@@ -20,7 +20,6 @@ processFile :: String -> String
 processFile txt =
   let (header:body) = lines txt
       newHeader = processHeader header
-      msgIndex  = fromJust (findIndex (=="Message") (wordsBy '\t' header))
       newBody   = processBody (findIndexes header) body
    in unlines (newHeader:newBody)
 
