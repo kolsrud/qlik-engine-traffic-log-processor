@@ -90,7 +90,7 @@ processBodyProps state props =
   case m_id props of
     Nothing -> (state, props { m_transactionsInProgress = snd state })
     Just id -> case (m_method props, m_direction props) of
-      (Just method, Nothing) -> error ("Method without direction: " ++ method ++ " #" ++ m_timeStamp props)
+      (Just method, Nothing) -> error ("Method without direction: " ++ method ++ " @" ++ m_timeStamp props)
       (Just method, Just Incoming) -> incomingRequest id method state props
       (Nothing,     Just Outgoing) -> outgoingResponse id state props
       (Nothing, Nothing) -> (state, props { m_transactionsInProgress = snd state })
@@ -98,7 +98,7 @@ processBodyProps state props =
   incomingRequest :: Int -> String -> SeqState -> MessageProps -> (SeqState, MessageProps)
   incomingRequest reqId method (requests, cnt) props =
       case m_handle props of
-         Nothing -> error ("Incoming method without handle: " ++ method ++ " #" ++ m_timeStamp props)
+         Nothing -> error ("Incoming method without handle: " ++ method ++ " @" ++ m_timeStamp props)
          Just handle ->
            let newRequest = (reqId, RequestInfo (m_timeStamp props) method handle)
                newCnt     = cnt + 1
@@ -107,7 +107,7 @@ processBodyProps state props =
   outgoingResponse :: Int -> SeqState -> MessageProps -> (SeqState, MessageProps)
   outgoingResponse reqId (requests, cnt) props =
         case map snd $ filter (fst `is` (==reqId)) requests of
-          [] -> trace ("Response for unknown request: " ++ show reqId ++ " #" ++ m_timeStamp props)
+          [] -> trace ("Response for unknown request: " ++ show reqId ++ " @" ++ m_timeStamp props)
                       ((requests, cnt), props { m_transactionsInProgress = cnt })
           [RequestInfo timestamp method handle] ->
             let newRequests = filter (fst `is` (/=reqId)) requests
@@ -120,7 +120,7 @@ processBodyProps state props =
                         }
                 )
           timestamps ->
-            trace ("Response for multiple concurrent requests: " ++ show reqId ++ " Assuming youngest #" ++ m_timeStamp props) $
+            trace ("Response for multiple concurrent requests: " ++ show reqId ++ " Assuming youngest @" ++ m_timeStamp props) $
               let (matching, others) = partition (fst `is` (==reqId)) requests
                   RequestInfo timestamp  method handle = snd $ head matching
                   newRequests = (tail matching) ++ others
@@ -168,7 +168,7 @@ processBodySessionInstance state props =
   case m_id props of
     Nothing -> (state, props)
     Just id -> case m_direction props of
-      Nothing -> error ("Message without direction: #" ++ m_timeStamp props)
+      Nothing -> error ("Message without direction: @" ++ m_timeStamp props)
       Just Incoming -> incomingRequest id (m_sessionInfo props) state props
       Just Outgoing -> ((id,m_sessionInfo props):state, props)
  where
@@ -177,4 +177,7 @@ processBodySessionInstance state props =
     ([],_) -> trace ("Encountered request without response: " ++ (show (m_method props)))
                     (state, props { m_hasResponse = Just False })
     ([(_, info)], newState) -> (newState, props { m_sessionInfo = info, m_hasResponse = Just True })
+    (((_, info):infos), newState) ->
+      trace ("Multiple requests for response with ID " ++ show msgId ++ ". Assuming youngest @" ++ m_timeStamp props)
+            (infos ++ newState, props { m_sessionInfo = info, m_hasResponse = Just True })
    
