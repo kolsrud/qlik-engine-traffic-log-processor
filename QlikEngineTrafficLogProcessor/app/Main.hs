@@ -139,6 +139,7 @@ processHeader line =
                               , "HasResponse"
                               , "Method"
                               , "Handle"
+                              , "AssignedHandle"
                               , "MsgId"
                               , "IsError"
                               , "TimeStampRequest"

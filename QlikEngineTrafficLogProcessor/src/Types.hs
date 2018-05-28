@@ -14,6 +14,7 @@ data MessageProps = MessageProps {
        m_sessionInfo            :: SessionInfo,
        m_method                 :: Maybe String,
        m_handle                 :: Maybe Int,
+       m_assignedHandle         :: Maybe Int,
        m_direction              :: Maybe Direction,
        m_hasResponse            :: Maybe Bool,
        m_isError                :: Bool,
@@ -29,6 +30,7 @@ defaultMessageProps msg ts = MessageProps {
        m_sessionInfo            = emptySession,
        m_method                 = Nothing,
        m_handle                 = Nothing,
+       m_assignedHandle         = Nothing,
        m_direction              = Nothing,
        m_hasResponse            = Nothing,
        m_isError                = False,
@@ -50,11 +52,12 @@ emptySession :: SessionInfo
 emptySession = SessionInfo "" "" ""
 
 instance Show MessageProps where
-  show msgProps = unWordsBy '\t' $ map ($msgProps) [ printMaybe m_direction   show
-                                                   , printMaybe m_hasResponse show
-                                                   , printMaybe m_method      id
-                                                   , printMaybe m_handle      show
-                                                   , printMaybe m_id          show
+  show msgProps = unWordsBy '\t' $ map ($msgProps) [ printMaybe m_direction        show
+                                                   , printMaybe m_hasResponse      show
+                                                   , printMaybe m_method           id
+                                                   , printMaybe m_handle           show
+                                                   , printMaybe m_assignedHandle   show
+                                                   , printMaybe m_id               show
                                                    , show.m_isError
                                                    , printMaybe m_timeStampRequest id
                                                    , show.m_transactionsInProgress
