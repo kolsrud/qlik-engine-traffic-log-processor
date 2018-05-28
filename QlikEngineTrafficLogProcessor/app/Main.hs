@@ -10,11 +10,14 @@ import Data.List
 
 main :: IO ()
 main = do args <- getArgs
-          putStrLn (show args)
-          let fileName = (head args)
-          txt  <- readFile fileName
-          let newTxt = processFile txt
-          writeFile ("New" ++ fileName) newTxt
+          if null args then
+            putStrLn "Usage: TrafficLogProcessor.exe <traffic log file name>"
+           else do
+            let fileName = (head args)
+            putStrLn $ "Processing file " ++ fileName
+            txt  <- readFile fileName
+            let newTxt = processFile txt
+            writeFile ("New" ++ fileName) newTxt
 
 processFile :: String -> String
 processFile txt =
@@ -135,20 +138,7 @@ processBodyProps state props =
 processHeader :: String -> String
 processHeader line =
   let headers = wordsBy '\t' line
-      newHeaders = headers ++ [ "Direction"
-                              , "HasResponse"
-                              , "Method"
-                              , "Handle"
-                              , "AssignedHandle"
-                              , "MsgId"
-                              , "IsError"
-                              , "TimeStampRequest"
-                              , "TransactionsInProgress"
-                              , "SessionId"
-                              , "SessionUserDir"
-                              , "SessionUserId"
-                              ]
-   in unWordsBy '\t' newHeaders
+   in unWordsBy '\t' (headers ++ newHeaders)
 
 getDir line = case take 3 line of
                 "<<<" -> Just Outgoing

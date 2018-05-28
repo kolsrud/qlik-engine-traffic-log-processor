@@ -3,6 +3,7 @@ module Types
     , SessionInfo(..)
     , defaultMessageProps
     , Direction(..)
+    , newHeaders
     ) where
 
 import GenericUtilities (unWordsBy)
@@ -50,6 +51,20 @@ instance Show SessionInfo where
      
 emptySession :: SessionInfo
 emptySession = SessionInfo "" "" ""
+
+newHeaders = [ "Direction"
+             , "HasResponse"
+             , "Method"
+             , "Handle"
+             , "AssignedHandle"
+             , "MsgId"
+             , "IsError"
+             , "TimeStampRequest"
+             , "TransactionsInProgress"
+             , "SessionId"
+             , "SessionUserDir"
+             , "SessionUserId"
+             ]
 
 instance Show MessageProps where
   show msgProps = unWordsBy '\t' $ map ($msgProps) [ printMaybe m_direction        show
