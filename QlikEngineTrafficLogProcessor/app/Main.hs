@@ -7,6 +7,8 @@ import Debug.Trace
 import System.Environment
 import Data.Maybe
 import Data.List
+import Data.HashMap.Strict(HashMap)
+import qualified Data.HashMap.Strict as Map
 
 main :: IO ()
 main = do args <- getArgs
@@ -49,7 +51,7 @@ findIndexes line =
 processBody :: MessageIndexes -> [String] -> [String]
 processBody indexes body =
   let msgProps      = map (processBodyLine indexes) body
-      (_, seqProps) = processBodySequence ([],0) msgProps
+      (_, seqProps) = processBodySequence ([], Map.empty, 0) msgProps
       withSession   = reverse $ snd $ processBodySession [] (reverse seqProps)
    in zipWith (\s0 s1 -> s0 ++ "\t" ++ s1) body $ map show withSession
 
@@ -77,7 +79,7 @@ data RequestInfo = RequestInfo { r_timestamp :: String
                                , r_handle    :: Int
                                }
 
-type SeqState = ([(Int, RequestInfo)], Int)
+type SeqState = ([(Int, RequestInfo)], HashMap Int ObjectInfo, Int)
 
 processBodySequence :: SeqState -> [MessageProps] -> (SeqState, [MessageProps])
 processBodySequence state [] = (state, [])
@@ -89,51 +91,61 @@ is :: (a -> b) -> (b -> Bool) -> a -> Bool
 is f p = p.f
 
 processBodyProps :: SeqState -> MessageProps -> (SeqState, MessageProps)
-processBodyProps state props =
+processBodyProps state@(_,_,cnt) props =
   case m_id props of
-    Nothing -> (state, props { m_transactionsInProgress = snd state })
+    Nothing -> (state, props { m_transactionsInProgress = cnt })
     Just id -> case (m_method props, m_direction props) of
       (Just method, Nothing) -> error ("Method without direction: " ++ method ++ " @" ++ m_timeStamp props)
       (Just method, Just Incoming) -> incomingRequest id method state props
       (Nothing,     Just Outgoing) -> outgoingResponse id state props
-      (Nothing, Nothing) -> (state, props { m_transactionsInProgress = snd state })
+      (Nothing, Nothing) -> (state, props { m_transactionsInProgress = cnt })
  where
   incomingRequest :: Int -> String -> SeqState -> MessageProps -> (SeqState, MessageProps)
-  incomingRequest reqId method (requests, cnt) props =
+  incomingRequest reqId method (requests, handleInfo, cnt) props =
       case m_handle props of
          Nothing -> error ("Incoming method without handle: " ++ method ++ " @" ++ m_timeStamp props)
          Just handle ->
            let newRequest = (reqId, RequestInfo (m_timeStamp props) method handle)
                newCnt     = cnt + 1
-            in ((newRequest:requests, newCnt), props { m_transactionsInProgress = newCnt })
+            in ( (newRequest:requests, handleInfo, newCnt)
+               , props { m_transactionsInProgress = newCnt
+                       , m_objectInfo = if handle == -1
+                                        then Just hubObjectInf
+                                        else Map.lookup handle handleInfo
+                       }
+               )
 
+  hubObjectInf = ObjectInfo "" "Hub" Nothing
+ 
   outgoingResponse :: Int -> SeqState -> MessageProps -> (SeqState, MessageProps)
-  outgoingResponse reqId (requests, cnt) props =
-        case map snd $ filter (fst `is` (==reqId)) requests of
-          [] -> trace ("Response for unknown request: " ++ show reqId ++ " @" ++ m_timeStamp props)
-                      ((requests, cnt), props { m_transactionsInProgress = cnt })
-          [RequestInfo timestamp method handle] ->
-            let newRequests = filter (fst `is` (/=reqId)) requests
-                newCnt      = cnt - 1
-             in ( (newRequests, newCnt)
+  outgoingResponse reqId (requests, handleInfo, cnt) props =
+        case partition (fst `is` (==reqId)) requests of
+          ([],_) -> trace ("Response for unknown request: " ++ show reqId ++ " @" ++ m_timeStamp props)
+                          ((requests, handleInfo, cnt), props { m_transactionsInProgress = cnt })
+          (m:ms, others) ->
+            let RequestInfo timestamp method handle =
+                  if (not $ null ms) then
+                    trace ( "Response for multiple concurrent requests: " ++ show reqId ++
+                            " Assuming youngest @" ++ m_timeStamp props
+                          ) (snd m)
+                  else snd m
+                newHandleInfo = maybe handleInfo
+                                      (\(assignedHandle, objectInfo) -> Map.insert assignedHandle objectInfo handleInfo)
+                                      (do assignedHandle <- m_assignedHandle props
+                                          objectInfo     <- m_objectInfo     props
+                                          return (assignedHandle, objectInfo)
+                                      )
+                newCnt        = cnt - 1
+             in ( (ms ++ others, newHandleInfo, newCnt)
                 , props { m_timeStampRequest       = Just timestamp
                         , m_method                 = Just method
                         , m_handle                 = Just handle
+                        , m_objectInfo             = if handle == -1
+                                                     then Just hubObjectInf
+                                                     else Map.lookup handle newHandleInfo
                         , m_transactionsInProgress = newCnt
                         }
                 )
-          timestamps ->
-            trace ("Response for multiple concurrent requests: " ++ show reqId ++ " Assuming youngest @" ++ m_timeStamp props) $
-              let (matching, others) = partition (fst `is` (==reqId)) requests
-                  RequestInfo timestamp  method handle = snd $ head matching
-                  newRequests = (tail matching) ++ others
-                  newCnt      = cnt - 1
-               in ( (newRequests, newCnt)
-                  , props { m_timeStampRequest       = Just timestamp
-                          , m_method                 = Just method
-                          , m_transactionsInProgress = newCnt
-                          }
-                  )
 
 processHeader :: String -> String
 processHeader line =

@@ -1,6 +1,7 @@
 module Types
     ( MessageProps(..)
     , SessionInfo(..)
+    , ObjectInfo(..)
     , defaultMessageProps
     , Direction(..)
     , newHeaders
@@ -16,6 +17,7 @@ data MessageProps = MessageProps {
        m_method                 :: Maybe String,
        m_handle                 :: Maybe Int,
        m_assignedHandle         :: Maybe Int,
+       m_objectInfo             :: Maybe ObjectInfo,
        m_direction              :: Maybe Direction,
        m_hasResponse            :: Maybe Bool,
        m_isError                :: Bool,
@@ -32,6 +34,7 @@ defaultMessageProps msg ts = MessageProps {
        m_method                 = Nothing,
        m_handle                 = Nothing,
        m_assignedHandle         = Nothing,
+       m_objectInfo             = Nothing,
        m_direction              = Nothing,
        m_hasResponse            = Nothing,
        m_isError                = False,
@@ -40,6 +43,15 @@ defaultMessageProps msg ts = MessageProps {
        m_transactionsInProgress = 0
      }
 
+data ObjectInfo = ObjectInfo {
+    o_id          :: String,
+    o_type        :: String,
+    o_genericType :: Maybe String
+  }
+
+instance Show ObjectInfo where
+  show (ObjectInfo objectId typ genericType) = unWordsBy '\t' [objectId, typ, maybe "" id genericType]
+
 data SessionInfo = SessionInfo { 
        s_sessionId :: String,
        s_userDir   :: String,
@@ -47,7 +59,7 @@ data SessionInfo = SessionInfo {
      }
 
 instance Show SessionInfo where
-  show (SessionInfo id dir usr) = unWordsBy '\t' [show id, dir, usr]
+  show (SessionInfo id dir usr) = unWordsBy '\t' [id, dir, usr]
      
 emptySession :: SessionInfo
 emptySession = SessionInfo "" "" ""
@@ -57,6 +69,9 @@ newHeaders = [ "Direction"
              , "Method"
              , "Handle"
              , "AssignedHandle"
+             , "ObjectId"
+             , "ObjectType"
+             , "GenericObjectType"
              , "MsgId"
              , "IsError"
              , "TimeStampRequest"
@@ -67,17 +82,18 @@ newHeaders = [ "Direction"
              ]
 
 instance Show MessageProps where
-  show msgProps = unWordsBy '\t' $ map ($msgProps) [ printMaybe m_direction        show
-                                                   , printMaybe m_hasResponse      show
-                                                   , printMaybe m_method           id
-                                                   , printMaybe m_handle           show
-                                                   , printMaybe m_assignedHandle   show
-                                                   , printMaybe m_id               show
+  show msgProps = unWordsBy '\t' $ map ($msgProps) [ printMaybe m_direction        show ""
+                                                   , printMaybe m_hasResponse      show ""
+                                                   , printMaybe m_method           id   ""
+                                                   , printMaybe m_handle           show ""
+                                                   , printMaybe m_assignedHandle   show ""
+                                                   , printMaybe m_objectInfo       show "\t\t"
+                                                   , printMaybe m_id               show ""
                                                    , show.m_isError
-                                                   , printMaybe m_timeStampRequest id
+                                                   , printMaybe m_timeStampRequest id   ""
                                                    , show.m_transactionsInProgress
                                                    , show.m_sessionInfo
                                                    ]
    where
-     printMaybe :: (MessageProps -> Maybe a) -> (a -> String) -> MessageProps -> String
-     printMaybe f showF p = maybe "" showF (f p)
+     printMaybe :: (MessageProps -> Maybe a) -> (a -> String) -> String -> MessageProps -> String
+     printMaybe f showF base p = maybe base showF (f p)
